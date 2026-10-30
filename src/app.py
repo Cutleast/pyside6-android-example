@@ -69,6 +69,21 @@ class App(BaseApp, Singleton):
         language: str
         if app_config.language == AppConfig.AppLanguage.System:
             language = detect_system_locale() or "en_US"
+            supported: list[str] = [
+                lang.value
+                for lang in AppConfig.AppLanguage
+                if lang != AppConfig.AppLanguage.System
+            ]
+            if language not in supported:
+                # fall back to a supported locale of the same language (de_AT -> de_DE)
+                language = next(
+                    (
+                        lang
+                        for lang in supported
+                        if lang.split("_")[0] == language.split("_")[0]
+                    ),
+                    "en_US",
+                )
         else:
             language = app_config.language.value
             QLocale.setDefault(QLocale.Language[app_config.language.name])
