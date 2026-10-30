@@ -15,7 +15,9 @@ from cutleast_core_lib.ui.utilities.state_manager import WidgetStateManager
 from PySide6.QtCore import QLocale, QTranslator
 
 from core.config.app_config import AppConfig
+from core.utilities.android import IS_ANDROID
 from ui.main_window import MainWindow
+from ui.utilities.android_window_adapter import AndroidWindowAdapter
 
 
 class App(BaseApp, Singleton):
@@ -39,6 +41,9 @@ class App(BaseApp, Singleton):
         super()._init()
 
         WidgetStateManager.get().register_geometry("main_window", self.main_window)
+
+        if IS_ANDROID:
+            AndroidWindowAdapter(self, self.main_window)
 
     @override
     def _init_app_config_manager(self) -> ConfigManager[BaseAppConfig]:

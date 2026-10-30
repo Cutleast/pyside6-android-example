@@ -164,6 +164,15 @@ P4A_ACTIVITY_PATCH: str = (
 )
 """Code inserted into the activity before Qt gets initialized."""
 
+P4A_KEY_HANDLER: re.Pattern[str] = re.compile(
+    r"\n    long lastBackClick.*?return super\.onKeyDown\(keyCode, event\);\n    }\n",
+    re.DOTALL,
+)
+"""
+The activity's key handler, which swallows the first press of every key (showing a
+"Click again to close the app" toast), so that the back key never reaches Qt.
+"""
+
 APP_TITLE: str = "PySide6 Example"
 """The app name displayed in the Android launcher."""
 
@@ -375,7 +384,7 @@ def slim_pyside_recipe() -> None:
 def prepare_python_for_android(commit: str) -> Path:
     """
     Checks out python-for-android at the specified commit and patches its Qt bootstrap
-    activity to disable Qt's accessibility bridge.
+    activity to disable Qt's accessibility bridge and to pass all keys to Qt.
 
     Args:
         commit (str): The commit to check out.
@@ -410,10 +419,14 @@ def prepare_python_for_android(commit: str) -> Path:
     if P4A_ACTIVITY_ANCHOR not in activity:
         raise ValueError(f"Unable to patch '{activity_file}': anchor not found.")
 
-    activity_file.write_text(
-        activity.replace(P4A_ACTIVITY_ANCHOR, P4A_ACTIVITY_PATCH + P4A_ACTIVITY_ANCHOR),
-        encoding="utf8",
+    activity = activity.replace(
+        P4A_ACTIVITY_ANCHOR, P4A_ACTIVITY_PATCH + P4A_ACTIVITY_ANCHOR
     )
+    activity, replacements = P4A_KEY_HANDLER.subn("\n", activity)
+    if replacements != 1:
+        raise ValueError(f"Unable to patch '{activity_file}': key handler not found.")
+
+    activity_file.write_text(activity, encoding="utf8")
     log.info(f"Patched python-for-android ({commit}) in '{P4A_FOLDER}'.")
 
     return P4A_FOLDER

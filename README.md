@@ -35,6 +35,7 @@ The script also works locally on Linux/WSL when the Android SDK, NDK r28c, a JDK
 - Qt's Android accessibility bridge deadlocks (and aborts the app) when a popup or other window opens while an accessibility service is active, e.g. a password manager's autofill. The build script therefore patches python-for-android's Qt bootstrap to set `QT_ANDROID_DISABLE_ACCESSIBILITY=1`.
 - Qt for Android is built without zstd support, so the Qt resources are compiled without compression for the APK (the desktop `pyside6-rcc` compresses with zstd by default).
 - On Android, the app runs like a built distribution (no stylesheet editor), the menu bar is drawn by Qt instead of natively and changing restart-requiring settings asks for a manual restart.
+- Android windows have no title bar, so [`AndroidWindowAdapter`](./src/ui/utilities/android_window_adapter.py) shows secondary windows and dialogs maximized and closes the topmost one with the system back gesture. For this, the build script also removes python-for-android's key handler, which swallows the first press of every key ("Click again to close the app").
 
 # Licensing
 
