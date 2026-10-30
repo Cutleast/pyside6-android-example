@@ -1,0 +1,83 @@
+name: Build Android APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ANDROID_NDK_VERSION: "28.2.13676358"  # r28c, required by pyside6-android-deploy
+  ANDROID_API_LEVEL: "35"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install python-for-android system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config \
+            zip unzip cmake libffi-dev libssl-dev zlib1g-dev
+
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-$ANDROID_API_LEVEL" \
+            "build-tools;$ANDROID_API_LEVEL.0.0" "ndk;$ANDROID_NDK_VERSION"
+          # buildozer still expects the command line tools in the legacy location
+          [ -e "$ANDROID_HOME/tools" ] || ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
+
+      - name: Set up virtual environment with uv
+        run: uv sync
+
+      - name: Generate Qt resources
+        run: |
+          uv run pyside6-lrelease res/loc/de.ts -qm res/loc/de.qm
+          uv run --directory core-lib python scripts/compile_resources.py
+          uv run pyside6-rcc res/resources.qrc -o src/resources_rc.py
+
+      - name: Set up Android build environment
+        run: |
+          PYSIDE_VERSION=$(uv run python -c "import PySide6; print(PySide6.__version__)")
+          # buildozer installs python-for-android's dependencies with pip
+          uv venv --seed --python 3.12 build/android-venv
+          uv pip install --python build/android-venv "pyside6==$PYSIDE_VERSION" \
+            buildozer==1.6.0 cython==0.29.33
+
+      - name: Cache buildozer and python-for-android builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            build/android/app/.buildozer
+            build/android/wheels
+          key: android-${{ hashFiles('scripts/build_android.py', 'uv.lock') }}
+          restore-keys: android-
+
+      - name: Build APK
+        run: |
+          build/android-venv/bin/python scripts/build_android.py \
+            --sdk-path "$ANDROID_HOME" \
+            --ndk-path "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: dist/*.apk
+          if-no-files-found: error

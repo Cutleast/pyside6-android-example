@@ -1,0 +1,189 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"extensions": {
+		"recommendations": [
+			"njpwerner.autodocstring",
+			"meta.pyrefly",
+			"ms-python.python",
+			"ms-python.debugpy",
+			"theqtcompany.qt-core",
+			"charliermarsh.ruff",
+			"redhat.vscode-xml"
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "update-lupdate-file",
+				"type": "shell",
+				"command": "${workspaceFolder}/update_lupdate_file.bat",
+			},
+			{
+				"label": "compile-qrc",
+				"type": "shell",
+				"command": "${workspaceFolder}/compile_qrc.bat",
+				"dependsOn": [
+					"compile-qts"
+				],
+				"problemMatcher": [],
+				"detail": "Compiles Qt resources into a usable Python module."
+			},
+			{
+				"label": "run-main",
+				"type": "shell",
+				"command": "${workspaceFolder}/.venv/scripts/python",
+				"args": [
+					"${workspaceFolder}/src/main.py"
+				],
+				"dependsOn": [
+					"compile-qrc"
+				],
+				"detail": "Runs main.py without debugger.",
+				"problemMatcher": []
+			},
+			{
+				"label": "update-qts",
+				"type": "shell",
+				"command": "${workspaceFolder}/update_qts.bat",
+				"dependsOn": [
+					"update-lupdate-file"
+				],
+				"detail": "Updates Qt language files"
+			},
+			{
+				"label": "compile-qts",
+				"type": "shell",
+				"command": "${workspaceFolder}/compile_qts.bat",
+				"dependsOn": [
+					"update-qts"
+				],
+				"detail": "Compiles Qt language files"
+			},
+			{
+				"label": "build",
+				"type": "shell",
+				"command": "${workspaceFolder}/build.bat",
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				},
+				"detail": "Builds app in ./dist"
+			},
+			{
+				"label": "run-linguist",
+				"type": "shell",
+				"command": "${workspaceFolder}/.venv/scripts/pyside6-linguist",
+				"args": [
+					"${workspaceFolder}/res/loc/de.ts"
+				],
+				"options": {
+					"cwd": "${workspaceFolder}"
+				},
+				"dependsOn": [
+					"update-qts"
+				],
+				"detail": "Opens Qt Linguist with German language file",
+				"problemMatcher": []
+			},
+			{
+				"label": "ruff",
+				"type": "shell",
+				"isBackground": true,
+				"presentation": {
+					"reveal": "never"
+				},
+				"command": "uv",
+				"args": [
+					"run",
+					"ruff",
+					"check",
+					"--watch",
+					"--output-format",
+					"github",
+					"."
+				],
+				"problemMatcher": [
+					{
+						"source": "Ruff",
+						"owner": "Ruff",
+						"severity": "warning",
+						"background": {
+							"beginsPattern": "\\[[^\\]]+\\] Found \\d+ errors\\. Watching for file changes\\.",
+							"endsPattern": "^$"
+						},
+						"pattern": [
+							{
+								"regexp": "^::\\w+ title=ruff \\(([^)]+)\\),file=[^,]+,line=(\\d+),col=(\\d+),endLine=(\\d+),endColumn=(\\d+)::([^:]+):\\d+:\\d+: [^\\s]+ (.*)$",
+								"code": 1,
+								"line": 2,
+								"column": 3,
+								"endLine": 4,
+								"endColumn": 5,
+								"file": 6,
+								"message": 7
+							}
+						]
+					}
+				],
+				"runOptions": {
+					"runOn": "folderOpen",
+				}
+			}
+		]
+	},
+	"settings": {
+		"editor.formatOnSave": true,
+		"[python]": {
+			"editor.codeActionsOnSave": {
+				"source.organizeImports.ruff": "explicit"
+			},
+		},
+		"files.associations": {
+			"*.ts": "xml",
+			"*.qrc": "xml"
+		},
+		"python.testing.pytestEnabled": true,
+		"python.testing.unittestEnabled": false,
+		"xml.format.maxLineWidth": 0,
+		"python.pyrefly.diagnosticMode": "workspace",
+		"debugpy.debugJustMyCode": false,
+		"python.testing.autoTestDiscoverOnSavePattern": "**/tests/**/*.py",
+		"python.testing.autoTestDiscoverOnSaveEnabled": true,
+		"python.testing.pytestArgs": [
+			"-vv"
+		],
+		"autoDocstring.startOnNewLine": true,
+		"python-envs.pythonProjects": [
+			{
+				"path": "core-lib",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip"
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"type": "debugpy",
+				"request": "launch",
+				"name": "Debug App",
+				"program": "${workspaceFolder}/src/main.py",
+				"cwd": "${workspaceFolder}",
+				"preLaunchTask": "compile-qrc"
+			},
+			{
+				"type": "debugpy",
+				"request": "launch",
+				"name": "Debug current file",
+				"program": "${file}",
+				"cwd": "${workspaceFolder}",
+			}
+		]
+	}
+}

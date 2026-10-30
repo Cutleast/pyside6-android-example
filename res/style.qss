@@ -1,0 +1,29 @@
+/* About Dialog */
+AboutDialog [title=true] {
+    font-weight: 300;
+}
+
+/* Menubar */
+MenuBar {
+    background-color: ${meta.window_bg};
+    border-bottom: ${metrics.border_width} solid ${colors.border};
+}
+MenuBar::item {
+    background-color: ${meta.window_bg};
+}
+MenuBar > QToolButton {
+    background-color: transparent;
+    border: none;
+    padding: ${metrics.spacing_xs} ${metrics.spacing_s};
+}
+
+/* Main Statusbar */
+QStatusBar {
+    background-color: ${meta.window_bg};
+    border-top: ${metrics.border_width} solid ${colors.border};
+    border-radius: 0px;
+}
+
+QStatusBar QAbstractButton {
+    padding: ${metrics.spacing_xs};
+}
