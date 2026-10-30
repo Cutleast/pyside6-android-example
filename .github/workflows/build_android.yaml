@@ -63,17 +63,22 @@ jobs:
           uv pip install --python build/android-venv -r \
             "$(build/android-venv/bin/python -c 'import PySide6, pathlib; print(pathlib.Path(PySide6.__file__).parent / "scripts" / "requirements-android.txt")')"
 
+      - name: Cache debug keystore
+        uses: actions/cache@v4
+        with:
+          # Keeps the APK signature stable so that new APKs can be installed as updates
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore
+
       - name: Cache buildozer and python-for-android builds
         uses: actions/cache@v4
         with:
-          # The debug keystore is kept so that new APKs can be installed as updates
+          # No restore-keys: python-for-android does not rebuild changed recipes
           path: |
-            ~/.android/debug.keystore
             ~/.buildozer
             build/android/app/.buildozer
             build/android/wheels
-          key: android-${{ hashFiles('scripts/build_android.py', 'uv.lock') }}
-          restore-keys: android-
+          key: android-build-${{ hashFiles('scripts/build_android.py', 'uv.lock') }}
 
       - name: Build APK
         run: |

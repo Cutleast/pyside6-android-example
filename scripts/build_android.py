@@ -104,6 +104,66 @@ Qt plugins (`<category>_<name>`) required for the SVG icons and stylesheet image
 are added if `pyside6-android-deploy` does not detect them itself.
 """
 
+SLIM_RECIPE_CODE: str = '''
+
+class SlimPySideRecipe(PySideRecipe):
+    """
+    Removes all Qt libraries, plugins and bindings the app does not use. The generated
+    recipe copies the complete wheel twice (into the APK's native libraries and into
+    the Python bundle).
+    """
+
+    def build_arch(self, arch):
+        super().build_arch(arch)
+
+        qt_modules = __QT_MODULES__
+        native_libs = __NATIVE_LIBS__
+
+        libs_dir = Path(self.ctx.get_libs_dir(arch.arch))
+        package_dir = Path(self.ctx.get_python_install_dir(arch.arch)) / "PySide6"
+        keep_libs = {f"lib{name}_{arch.arch}.so" for name in native_libs}
+        for qt_lib in (package_dir / "Qt" / "lib").iterdir():
+            if qt_lib.name not in keep_libs:
+                (libs_dir / qt_lib.name).unlink(missing_ok=True)
+
+        # Qt loads its libraries and plugins from the APK's native libraries
+        for folder in ("Qt", "include", "typesystems", "glue", "scripts"):
+            shutil.rmtree(package_dir / folder, ignore_errors=True)
+
+        for binding in package_dir.glob("Qt*.abi3.so"):
+            if binding.name.removesuffix(".abi3.so").removeprefix("Qt") not in qt_modules:
+                binding.unlink()
+                binding.with_name(binding.name.replace(".abi3.so", ".pyi")).unlink(
+                    missing_ok=True
+                )
+
+
+recipe = SlimPySideRecipe()
+'''
+"""Code appended to the generated PySide6 recipe to strip unused Qt components."""
+
+P4A_REPOSITORY: str = "https://github.com/kivy/python-for-android.git"
+"""The python-for-android repository."""
+
+P4A_FOLDER: Path = BUILD_FOLDER / "python-for-android"
+"""The folder for the patched python-for-android checkout."""
+
+P4A_ACTIVITY: Path = Path(
+    "pythonforandroid/bootstraps/qt/build/src/main/java/org/kivy/android/"
+    "PythonActivity.java"
+)
+"""The Java activity of python-for-android's Qt bootstrap."""
+
+P4A_ACTIVITY_ANCHOR: str = '        Log.v(TAG, "About to do super onCreate");\n'
+"""The line in the activity before which Qt gets initialized."""
+
+P4A_ACTIVITY_PATCH: str = (
+    "        // Qt's accessibility bridge deadlocks when a new window (e.g. a popup) is\n"
+    "        // created while an accessibility service (e.g. a password manager) is on.\n"
+    '        setEnvironmentVariable("QT_ANDROID_DISABLE_ACCESSIBILITY", "1");\n'
+)
+"""Code inserted into the activity before Qt gets initialized."""
+
 APP_TITLE: str = "PySide6 Example"
 """The app name displayed in the Android launcher."""
 
@@ -285,9 +345,84 @@ def init_deployment(
         )
 
 
+def slim_pyside_recipe() -> None:
+    """
+    Extends the generated PySide6 recipe so that only the Qt modules, plugins and
+    bindings detected by `pyside6-android-deploy` end up in the APK.
+    """
+
+    config = configparser.ConfigParser(interpolation=None)
+    config.read(STAGING_FOLDER / "pysidedeploy.spec", encoding="utf8")
+    qt_modules: list[str] = config["qt"]["modules"].split(",")
+    plugins: list[str] = config["android"]["plugins"].split(",")
+    local_libs: list[str] = config["buildozer"]["local_libs"].split(",")
+    native_libs: list[str] = [f"Qt6{module}" for module in qt_modules] + [
+        lib for lib in local_libs + [f"plugins_{plugin}" for plugin in plugins] if lib
+    ]
+
+    recipe_file: Path = (
+        STAGING_FOLDER / "deployment" / "recipes" / "PySide6" / "__init__.py"
+    )
+    code: str = SLIM_RECIPE_CODE.replace("__QT_MODULES__", repr(qt_modules)).replace(
+        "__NATIVE_LIBS__", repr(sorted(set(native_libs)))
+    )
+    with recipe_file.open("a", encoding="utf8") as file:
+        file.write(code)
+
+    log.info(f"Stripped PySide6 recipe down to {native_libs}.")
+
+
+def prepare_python_for_android(commit: str) -> Path:
+    """
+    Checks out python-for-android at the specified commit and patches its Qt bootstrap
+    activity to disable Qt's accessibility bridge.
+
+    Args:
+        commit (str): The commit to check out.
+
+    Raises:
+        ValueError: When the activity does not contain the expected code anymore.
+
+    Returns:
+        Path: The path to the python-for-android checkout.
+    """
+
+    if not (P4A_FOLDER / ".git").is_dir():
+        P4A_FOLDER.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q"], cwd=P4A_FOLDER, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", P4A_REPOSITORY],
+            cwd=P4A_FOLDER,
+            check=True,
+        )
+
+    subprocess.run(
+        ["git", "fetch", "-q", "--depth", "1", "origin", commit],
+        cwd=P4A_FOLDER,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "checkout", "-q", "--force", "FETCH_HEAD"], cwd=P4A_FOLDER, check=True
+    )
+
+    activity_file: Path = P4A_FOLDER / P4A_ACTIVITY
+    activity: str = activity_file.read_text(encoding="utf8")
+    if P4A_ACTIVITY_ANCHOR not in activity:
+        raise ValueError(f"Unable to patch '{activity_file}': anchor not found.")
+
+    activity_file.write_text(
+        activity.replace(P4A_ACTIVITY_ANCHOR, P4A_ACTIVITY_PATCH + P4A_ACTIVITY_ANCHOR),
+        encoding="utf8",
+    )
+    log.info(f"Patched python-for-android ({commit}) in '{P4A_FOLDER}'.")
+
+    return P4A_FOLDER
+
+
 def patch_buildozer_spec(version: str) -> None:
     """
-    Adds the app's Python requirements and metadata to the generated buildozer.spec.
+    Adds the app's Python requirements and metadata to the generated buildozer.spec and
+    makes buildozer use the patched python-for-android checkout.
 
     Args:
         version (str): The app version.
@@ -299,6 +434,7 @@ def patch_buildozer_spec(version: str) -> None:
     spec.read(spec_file, encoding="utf8")
 
     app = spec["app"]
+    app["p4a.source_dir"] = str(prepare_python_for_android(app["p4a.commit"]))
     requirements: list[str] = app["requirements"].split(",") + REQUIREMENTS
     app["requirements"] = ",".join(requirements)
     app["title"] = APP_TITLE
@@ -371,6 +507,7 @@ def main() -> None:
     init_deployment(
         pyside_wheel, shiboken_wheel, args.sdk_path.resolve(), args.ndk_path.resolve()
     )
+    slim_pyside_recipe()
     patch_buildozer_spec(version)
     build_apk()
 
