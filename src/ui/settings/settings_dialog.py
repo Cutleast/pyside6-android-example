@@ -2,7 +2,6 @@
 Copyright (c) Cutleast
 """
 
-import os
 import subprocess
 
 from cutleast_core_lib.core.config.exceptions import ConfigValidationError
@@ -194,4 +193,4 @@ class SettingsDialog(QDialog):
                 from app import App
 
                 if App.get().main_window.close():
-                    os.startfile(subprocess.list2cmdline(get_execution_info()[0]))
+                    subprocess.Popen(get_execution_info()[0])
