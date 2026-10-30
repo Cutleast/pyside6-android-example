@@ -20,7 +20,7 @@ jobs:
           submodules: recursive
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -59,6 +59,9 @@ jobs:
           uv venv --seed --python 3.12 build/android-venv
           uv pip install --python build/android-venv "pyside6==$PYSIDE_VERSION" \
             buildozer==1.6.0 cython==0.29.33
+          # host requirements of pyside6-android-deploy itself
+          uv pip install --python build/android-venv -r \
+            "$(build/android-venv/bin/python -c 'import PySide6, pathlib; print(pathlib.Path(PySide6.__file__).parent / "scripts" / "requirements-android.txt")')"
 
       - name: Cache buildozer and python-for-android builds
         uses: actions/cache@v4
