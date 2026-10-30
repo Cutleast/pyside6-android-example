@@ -44,7 +44,9 @@ class StatusBar(QStatusBar):
         self.__status_label.setProperty("monospace", True)
         self.__status_label.setTextFormat(Qt.TextFormat.PlainText)
         self.__log_signal.connect(
-            lambda text: self.__status_label.setText(cast(str, text).splitlines()[0]),
+            lambda text: self.__status_label.setText(
+                (cast(str, text).splitlines() or [""])[0]
+            ),
             Qt.ConnectionType.QueuedConnection,
         )
         self.insertPermanentWidget(0, self.__status_label, stretch=1)
