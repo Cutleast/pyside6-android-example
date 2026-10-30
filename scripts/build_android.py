@@ -52,6 +52,14 @@ CORE_LIB_FOLDER: Path = PROJECT_ROOT / "core-lib" / "src" / "cutleast_core_lib"
 CORE_LIB_EXCLUDES: list[str] = ["builder", "scripts", "test", "res"]
 """Core lib subpackages that are only required for development or Windows."""
 
+RESOURCE_MODULES: dict[Path, Path] = {
+    PROJECT_ROOT / "res" / "resources.qrc": Path("resources_rc.py"),
+    PROJECT_ROOT / "core-lib" / "res" / "resources.qrc": (
+        Path(CORE_LIB_FOLDER.name) / "ui" / "resources_rc.py"
+    ),
+}
+"""Qt resource collections and the staged modules they are compiled to."""
+
 SHIMS_FOLDER: Path = PROJECT_ROOT / "android" / "shims"
 """Modules replacing dependencies that cannot be built for Android."""
 
@@ -171,6 +179,30 @@ def stage_sources(version: str) -> None:
         encoding="utf8",
     )
     log.info(f"Staged sources in '{STAGING_FOLDER}' (version {version}).")
+
+
+def compile_resources() -> None:
+    """
+    Compiles the Qt resources of the app and the core lib into the staging folder.
+
+    The desktop builds of Qt compress resources with zstd by default, but Qt for Android
+    is built without zstd support and fails to open such resources. So they are
+    compiled without compression instead.
+    """
+
+    rcc: Path = Path(sys.executable).parent / "pyside6-rcc"
+    for qrc_file, module in RESOURCE_MODULES.items():
+        subprocess.run(
+            [
+                str(rcc),
+                "--no-compress",
+                str(qrc_file),
+                "-o",
+                str(STAGING_FOLDER / module),
+            ],
+            check=True,
+        )
+        log.info(f"Compiled '{qrc_file}' to '{module}'.")
 
 
 def download_wheel(package: str, version: str, arch: str) -> Path:
@@ -333,6 +365,7 @@ def main() -> None:
     pyside_version: str = PySide6.__version__
 
     stage_sources(version)
+    compile_resources()
     pyside_wheel: Path = download_wheel("pyside6", pyside_version, args.arch)
     shiboken_wheel: Path = download_wheel("shiboken6", pyside_version, args.arch)
     init_deployment(
