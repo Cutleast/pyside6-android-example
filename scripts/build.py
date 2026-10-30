@@ -42,7 +42,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     config = BuildConfig(
-        exe_stem="template",  # Enter the name of the executable without ".exe" suffix here
+        exe_stem="pyside6-android-example",  # Enter the name of the executable without ".exe" suffix here
         ext_resources_json=Path("res") / "ext_resources.json",
     )
     backend = Backend()
