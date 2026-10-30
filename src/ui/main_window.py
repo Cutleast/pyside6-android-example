@@ -66,8 +66,6 @@ class MainWindow(QMainWindow):
 
     def __init_menu_bar(self) -> None:
         self.__menu_bar = MenuBar()
-        # Android has no native menu bar that could display the menus
-        self.__menu_bar.setNativeMenuBar(not IS_ANDROID)
         self.setMenuBar(self.__menu_bar)
 
     def __init_main_widget(self) -> None:

@@ -3,7 +3,6 @@ Copyright (c) Cutleast
 """
 
 import platform
-import sys
 from typing import override
 
 import PySide6
@@ -11,7 +10,7 @@ from cutleast_core_lib.ui.theme.manager import ThemeManager
 from cutleast_core_lib.ui.theme.ui_mode import UiMode
 from cutleast_core_lib.ui.widgets.enum_dropdown import EnumDropdown
 from cutleast_core_lib.ui.widgets.toast import Toast
-from PySide6.QtCore import Qt, qVersion
+from PySide6.QtCore import QSysInfo, Qt, qVersion
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QFormLayout,
@@ -99,9 +98,10 @@ class MainWidget(QScrollArea):
         screen = QGuiApplication.primaryScreen()
         screen_size = screen.size()
 
+        platform_name: str
         if IS_ANDROID:
-            api_level: int = sys.getandroidapilevel()  # type: ignore[attr-defined]
-            platform_name = f"Android (API {api_level})"
+            # sys.getandroidapilevel() returns the API level Python was built for
+            platform_name = f"Android {QSysInfo.productVersion()}"
         else:
             platform_name = f"{platform.system()} {platform.release()}"
 

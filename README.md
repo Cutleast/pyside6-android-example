@@ -31,6 +31,7 @@ The script also works locally on Linux/WSL when the Android SDK, NDK r28c, a JDK
 
 - `material-color-utilities` is a C++ extension without an Android build. It is replaced by [a shim](./android/shims/material_color_utilities.py) based on `materialyoucolor`, which has a python-for-android recipe.
 - `pydantic` is pinned to 2.12.3 in the APK, because python-for-android's `pydantic-core` recipe is at 2.41.4.
+- Qt for Android is built without zstd support, so the Qt resources are compiled without compression for the APK (the desktop `pyside6-rcc` compresses with zstd by default).
 - On Android, the app runs like a built distribution (no stylesheet editor), the menu bar is drawn by Qt instead of natively and changing restart-requiring settings asks for a manual restart.
 
 # Licensing
