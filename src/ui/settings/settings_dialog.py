@@ -107,6 +107,7 @@ class SettingsDialog(QDialog):
             self.tr("Settings marked with * require a restart to take effect.")
         )
         restart_hint_label.setProperty("secondary", True)
+        restart_hint_label.setWordWrap(True)
         self.__vlayout.addWidget(restart_hint_label)
 
     def __init_settings_widget(self) -> None:

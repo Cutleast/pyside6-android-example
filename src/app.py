@@ -18,6 +18,7 @@ from core.config.app_config import AppConfig
 from core.utilities.android import IS_ANDROID
 from ui.main_window import MainWindow
 from ui.utilities.android_window_adapter import AndroidWindowAdapter
+from ui.utilities.qt_browser import QtBrowser
 
 
 class App(BaseApp, Singleton):
@@ -44,6 +45,7 @@ class App(BaseApp, Singleton):
 
         if IS_ANDROID:
             AndroidWindowAdapter(self, self.main_window)
+            QtBrowser.register()
 
     @override
     def _init_app_config_manager(self) -> ConfigManager[BaseAppConfig]:

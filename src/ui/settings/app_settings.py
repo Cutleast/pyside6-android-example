@@ -8,8 +8,10 @@ from cutleast_core_lib.core.config.app_config import AppConfig as BaseAppConfig
 from cutleast_core_lib.core.config.manager import ConfigManager
 from cutleast_core_lib.ui.settings.app_settings import AppSettings as BaseAppSettings
 from cutleast_core_lib.ui.widgets.enum_dropdown import EnumDropdown
+from PySide6.QtWidgets import QFormLayout
 
 from core.config.app_config import AppConfig
+from core.utilities.android import IS_ANDROID
 
 
 class AppSettings(BaseAppSettings):
@@ -40,6 +42,10 @@ class AppSettings(BaseAppSettings):
         self._basic_flayout.insertRow(
             5, "*" + self.tr("App language:"), self.__language_box
         )
+
+        if IS_ANDROID:
+            # Puts the labels above their fields to fit the narrow screen
+            self._basic_flayout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
 
     @override
     def apply(self) -> None:
