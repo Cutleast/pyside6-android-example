@@ -18,6 +18,7 @@ The APK is written to `./dist`.
 import argparse
 import configparser
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -89,6 +90,12 @@ Qt modules that are not imported directly but are required at runtime (e.g. for 
 icons).
 """
 
+REQUIRED_QT_PLUGINS: list[str] = ["imageformats_qsvg", "iconengines_qsvgicon"]
+"""
+Qt plugins (`<category>_<name>`) required for the SVG icons and stylesheet images. They
+are added if `pyside6-android-deploy` does not detect them itself.
+"""
+
 APP_TITLE: str = "PySide6 Example"
 """The app name displayed in the Android launcher."""
 
@@ -110,6 +117,21 @@ def get_project_version() -> str:
 
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as file:
         return tomllib.load(file)["project"]["version"]
+
+
+def get_build_env() -> dict[str, str]:
+    """
+    Returns:
+        dict[str, str]:
+            The environment for the build tools with the current virtual environment
+            activated, so that buildozer finds its tools (e.g. `cython`).
+    """
+
+    env: dict[str, str] = os.environ.copy()
+    env["VIRTUAL_ENV"] = sys.prefix
+    env["PATH"] = os.pathsep.join([str(Path(sys.executable).parent), env["PATH"]])
+
+    return env
 
 
 def stage_sources(version: str) -> None:
@@ -180,7 +202,9 @@ def init_deployment(
 ) -> None:
     """
     Runs `pyside6-android-deploy --init` to generate the p4a recipes for PySide6 and
-    shiboken6 and the buildozer.spec file.
+    shiboken6 and the buildozer.spec file. If required Qt plugins were not detected,
+    they are added to the generated pysidedeploy.spec and the deployment files are
+    generated again from it.
 
     Args:
         pyside_wheel (Path): Path to the PySide6 Android wheel.
@@ -190,24 +214,43 @@ def init_deployment(
     """
 
     deploy_tool: Path = Path(sys.executable).parent / "pyside6-android-deploy"
-    subprocess.run(
-        [
-            str(deploy_tool),
-            "--init",
-            "--force",
-            "--verbose",
-            "--keep-deployment-files",
-            "--no-install",
-            f"--name={PACKAGE_NAME}",
-            f"--wheel-pyside={pyside_wheel}",
-            f"--wheel-shiboken={shiboken_wheel}",
-            f"--sdk-path={sdk_path}",
-            f"--ndk-path={ndk_path}",
-            f"--extra-modules={','.join(EXTRA_QT_MODULES)}",
-        ],
-        cwd=STAGING_FOLDER,
-        check=True,
-    )
+    command: list[str] = [
+        str(deploy_tool),
+        "--init",
+        "--force",
+        "--verbose",
+        "--keep-deployment-files",
+        "--no-install",
+        f"--name={PACKAGE_NAME}",
+        f"--wheel-pyside={pyside_wheel}",
+        f"--wheel-shiboken={shiboken_wheel}",
+        f"--sdk-path={sdk_path}",
+        f"--ndk-path={ndk_path}",
+        f"--extra-modules={','.join(EXTRA_QT_MODULES)}",
+    ]
+    subprocess.run(command, cwd=STAGING_FOLDER, env=get_build_env(), check=True)
+
+    config_file: Path = STAGING_FOLDER / "pysidedeploy.spec"
+    config = configparser.ConfigParser(interpolation=None)
+    config.read(config_file, encoding="utf8")
+    plugins: list[str] = [
+        plugin for plugin in config["android"].get("plugins", "").split(",") if plugin
+    ]
+    log.info(f"Detected Qt plugins: {plugins}")
+
+    missing_plugins: list[str] = [p for p in REQUIRED_QT_PLUGINS if p not in plugins]
+    if missing_plugins:
+        log.info(f"Adding missing Qt plugins: {missing_plugins}")
+        config["android"]["plugins"] = ",".join(plugins + missing_plugins)
+        with config_file.open("w", encoding="utf8") as file:
+            config.write(file)
+
+        subprocess.run(
+            command + [f"--config-file={config_file}"],
+            cwd=STAGING_FOLDER,
+            env=get_build_env(),
+            check=True,
+        )
 
 
 def patch_buildozer_spec(version: str) -> None:
@@ -256,6 +299,7 @@ def build_apk() -> Path:
     subprocess.run(
         [sys.executable, "-m", "buildozer", "android", "debug"],
         cwd=STAGING_FOLDER,
+        env=get_build_env(),
         check=True,
     )
 
