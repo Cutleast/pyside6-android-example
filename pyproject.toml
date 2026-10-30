@@ -27,7 +27,6 @@ dev = [
 search-path = [
     "src",
     "core-lib/src",
-    "mod-manager-lib/src",
 ]
 project-includes = [
     "src/**/*.py",
