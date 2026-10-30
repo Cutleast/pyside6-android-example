@@ -8,7 +8,6 @@ from cutleast_core_lib.core.config.manager import ConfigManager
 from cutleast_core_lib.core.utilities.updater import Updater
 from cutleast_core_lib.ui.utilities.window_manager import WindowManager
 from cutleast_core_lib.ui.widgets.about_dialog import AboutDialog
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QMessageBox
 
@@ -93,7 +92,6 @@ class MainWindow(QMainWindow):
             messagebox = QMessageBox(self)
             messagebox.setWindowTitle(self.tr("No Updates Available"))
             messagebox.setText(self.tr("There are no updates available."))
-            messagebox.setTextFormat(Qt.TextFormat.RichText)
             messagebox.setIcon(QMessageBox.Icon.Information)
             messagebox.exec()
 
